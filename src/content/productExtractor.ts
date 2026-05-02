@@ -18,7 +18,15 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: "£",
   JPY: "¥",
   CNY: "¥",
-  KRW: "₩"
+  KRW: "₩",
+  MYR: "RM",
+  IDR: "Rp",
+  THB: "฿",
+  PHP: "₱",
+  INR: "₹",
+  VND: "₫",
+  HKD: "HK$",
+  TWD: "NT$"
 };
 
 function text(value: unknown): string | undefined {
@@ -35,6 +43,19 @@ function parsePriceValue(priceText?: string): number | undefined {
   if (!priceText) return undefined;
   const match = priceText.replace(/,/g, "").match(/(\d+(?:\.\d{1,2})?)/);
   return match ? Number(match[1]) : undefined;
+}
+
+function detectCurrency(priceText?: string): string | undefined {
+  if (!priceText) return undefined;
+  const normalized = priceText.trim().toUpperCase();
+  const code = normalized.match(/\b(USD|CAD|AUD|NZD|SGD|EUR|GBP|JPY|CNY|KRW|MYR|IDR|THB|PHP|INR|VND|HKD|TWD)\b/);
+  if (code) return code[1];
+  if (/\bRM\s*\d/.test(normalized)) return "MYR";
+  if (/^₹/.test(priceText)) return "INR";
+  if (/^₱/.test(priceText)) return "PHP";
+  if (/^฿/.test(priceText)) return "THB";
+  if (/^Rp/i.test(priceText)) return "IDR";
+  return undefined;
 }
 
 function absoluteUrl(value?: string): string | undefined {
@@ -109,9 +130,10 @@ function getOffer(product: JsonLdNode): JsonLdNode | undefined {
 function formatPrice(price: string, currency?: string): string {
   const trimmed = price.trim();
   if (!trimmed) return "";
-  if (/[$€£¥₩]/.test(trimmed)) return currency ? `${trimmed} ${currency}` : trimmed;
+  if (/^(RM|Rp|HK\$|NT\$|\$|€|£|¥|₩|₹|₱|฿|₫)/i.test(trimmed)) return currency ? `${trimmed} ${currency}` : trimmed;
   const symbol = currency ? CURRENCY_SYMBOLS[currency.toUpperCase()] : undefined;
-  return `${symbol ?? ""}${trimmed}${currency ? ` ${currency}` : ""}`.trim();
+  if (symbol) return `${symbol}${trimmed}${currency ? ` ${currency}` : ""}`.trim();
+  return `${trimmed}${currency ? ` ${currency}` : ""}`.trim();
 }
 
 function getJsonLdProduct(): Partial<ExtractedProduct> {
@@ -128,7 +150,7 @@ function getJsonLdProduct(): Partial<ExtractedProduct> {
       const brand = typeof brandNode === "object" && brandNode ? text((brandNode as JsonLdNode).name) : text(brandNode);
       const images = asArray(product.image).map(text).filter(Boolean) as string[];
       const price = text(offer?.price ?? offer?.lowPrice);
-      const currency = text(offer?.priceCurrency);
+      const currency = text(offer?.priceCurrency) || detectCurrency(price);
       const shipping = asArray(offer?.shippingDetails)
         .map((detail) => {
           if (!detail || typeof detail !== "object") return undefined;
@@ -161,7 +183,7 @@ function getJsonLdProduct(): Partial<ExtractedProduct> {
 
 function getMetaProduct(): Partial<ExtractedProduct> {
   const amount = meta('meta[property="product:price:amount"]') || meta('meta[name="twitter:data1"]');
-  const currency = meta('meta[property="product:price:currency"]');
+  const currency = meta('meta[property="product:price:currency"]') || detectCurrency(amount);
   return {
     name: meta('meta[property="og:title"]') || meta('meta[name="twitter:title"]'),
     brand: meta('meta[property="og:site_name"]') || meta('meta[name="application-name"]'),
@@ -190,6 +212,7 @@ function getSelectorProduct(): Partial<ExtractedProduct> {
     brand,
     priceText,
     priceValue: parsePriceValue(priceText),
+    currency: detectCurrency(priceText),
     shippingText,
     imageUrl: absoluteUrl(meta('meta[property="og:image"]')) || firstImage(["main img", '[class*="product" i] img'])
   };
@@ -219,7 +242,7 @@ function extractProduct(): ExtractedProduct | null {
     name: name || "Untitled product",
     priceText: extracted.priceText || "Price unknown",
     priceValue: extracted.priceValue ?? parsePriceValue(extracted.priceText),
-    currency: extracted.currency,
+    currency: extracted.currency ?? detectCurrency(extracted.priceText),
     shippingText: extracted.shippingText,
     imageUrl: extracted.imageUrl,
     productUrl: extracted.productUrl || pageUrl,
