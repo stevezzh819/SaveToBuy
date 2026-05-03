@@ -2,6 +2,10 @@
 
 SaveToBuy is a Manifest V3 Chrome extension for saving clothing products from shopping sites into a unified local closet.
 
+## Privacy Policy
+
+SaveToBuy stores saved product data locally in the user's Chrome browser and does not use a backend server for this MVP. See [PRIVACY.md](./PRIVACY.md) for the full privacy policy.
+
 ## Local Setup
 
 ```bash
@@ -43,4 +47,3 @@ Upload `savetobuy-extension.zip` in the Chrome Web Store developer dashboard.
 - Shipping fee is often unavailable until checkout or address selection, so the closet shows `Shipping unknown` when it cannot be detected.
 - Data is stored only in `chrome.storage.local`; there is no account sync or backend in this MVP.
 - Duplicate saves are detected by exact product URL.
-# SaveToBuy
